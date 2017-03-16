@@ -90,6 +90,7 @@ class Supervisor:
                 # rospy.logwarn([ x+OFFSET.pose.position.x, y+OFFSET.pose.position.y, \
                       # theta+tf.transformations.euler_from_quaternion(OFFSET.pose.orientation)[2] ])
                
+
                 self.waypoint_locations[int(tag_number)] = [x, y, theta]
 
                 rospy.logwarn(self.waypoint_locations[int(tag_number)])
@@ -117,7 +118,7 @@ class Supervisor:
         #         all_tags_seen = False
         #         return all_tags_seen
 
-        if len(self.waypoint_locations.keys()) < 8:
+        if len(self.waypoint_locations.keys()) < 8: 
             all_tags_seen = False
 
         return all_tags_seen
@@ -137,10 +138,15 @@ class Supervisor:
 
                 msg=Float32MultiArray()
                 msg.data=[self.flag] + loc
-
             else: 
+                rospy.logwarn('1')
                 self.find_bot()
+                rospy.logwarn('2')
+                # rospy.logwarn(self.bot_pose.shape, self.bot_pose)
+                # rospy.logwarn(self.current_g.shape, self.current_g)
                 dist=np.linalg.norm(np.sum([self.bot_pose[:2], -self.current_g[:2]], axis=0)) #euclidian distance
+                # dist = np.linalg.norm([self.bot_pose[0] - self.current_g[0], self.bot_pose[1] - self.current_g[1]])
+                rospy.logwarn('3')
                 if dist<self.thresh:
                     rospy.logwarn('passed checkpoint')
                     self.step+=1

@@ -1,4 +1,14 @@
 #!/usr/bin/env python
+
+# Subscribes to:
+# "map" --> OccupancyGrid
+# "map_metadata" --> MapMetaData
+# "mission_mode" --> Float32MultiArray which is 4-element list [flag x y theta] of types [Float32 Float32 Float32 Float32]
+
+# Publishes:
+# nav_path_pub --> publishes path_ms of type Path() including attribute of list of poses pose_st.poses
+#  wp_node_pub --> publishes pose_st of type PoseStamped() that is the pose of the current goal for current search
+
 import rospy
 from nav_msgs.msg import OccupancyGrid
 from nav_msgs.msg import MapMetaData
