@@ -46,7 +46,7 @@ class Supervisor:
         self.waypoint_offset.pose.orientation.w = quat[3]
 
         self.mode_pub = rospy.Publisher('/mission_mode', Float32MultiArray ,queue_size=10)
-        self.tag_pub = rospy.Publisher('/next_tag', Float32MultiArray ,queue_size=10)
+        # self.tag_pub = rospy.Publisher('/next_tag', Float32MultiArray ,queue_size=10)
 
         self.testing_pub = rospy.Publisher('/testingOnly', Float32MultiArray, queue_size=10)
 
@@ -84,6 +84,9 @@ class Supervisor:
 
                 # self.waypoint_locations[int(tag_number)] = [ x+OFFSET.pose.position.x, y+OFFSET.pose.position.y, \
                      # theta+tf.transformations.euler_from_quaternion(OFFSET.pose.orientation)[2] ]
+
+                # rospy.logwarn([ x+OFFSET.pose.position.x, y+OFFSET.pose.position.y, \
+                      # theta+tf.transformations.euler_from_quaternion(OFFSET.pose.orientation)[2] ])
                
                 self.waypoint_locations[int(tag_number)] = [x, y, theta]
 
@@ -143,6 +146,8 @@ class Supervisor:
                 msg=Float32MultiArray()
                 tag=self.mission[len(self.been_at)-1]
                 msg.data=[self.flag] + self.current_g
+
+            #self.mode_pub.publish(msg)
 
             tagsSeen = Float32MultiArray()
             tagsSeen.data = self.waypoint_locations.keys()
