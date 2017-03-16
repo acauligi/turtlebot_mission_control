@@ -29,10 +29,10 @@ class Supervisor:
         rospy.init_node('turtlebot_supervisor', anonymous=True)
         self.trans_listener = tf.TransformListener()
         self.trans_broad = tf.TransformBroadcaster()
-        self.bot_pose=np.array([0., 0., 0.])# x, y, th
+        self.bot_pose=np.array([0.,0.,0.])
 
         #relevant i execution phase
-        self.current_g=-np.ones((1,3))
+        self.current_g=np.array([0.,0.,0.])
         self.step=0
         #self.next_goal=[]
         rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.rviz_goal_callback)    # rviz "2D Nav Goal"
@@ -57,7 +57,7 @@ class Supervisor:
 
         self.flag = 0. #exploration phase, no navigator
         self.loc = [0., 0., 0.]
-        self.thresh=0.01
+        self.thresh=0.1
 
     def rviz_goal_callback(self, msg):
         self.next_goal=pose_to_xyth(msg.pose)
@@ -72,26 +72,20 @@ class Supervisor:
             try:
                 self.waypoint_offset.header.frame_id = "/tag_{0}".format(tag_number)
 
-                (translation, rotation) = self.trans_listener.lookupTransform("/map", \
-                    self.waypoint_offset.header.frame_id, rospy.Time(0))
+                (translation, rotation) = self.trans_listener.lookupTransform("/map", self.waypoint_offset.header.frame_id, rospy.Time(0))
 
                 x = translation[0]
                 y = translation[1]
                 euler = tf.transformations.euler_from_quaternion(rotation)
                 theta = euler[2]
 
-                
-                # OFFSET = rospy.logwarn(self.trans_listener.transformPose("/map", self.waypoint_offset))
-
-
                 # self.waypoint_locations[int(tag_number)] = [ x+OFFSET.pose.position.x, y+OFFSET.pose.position.y, \
                      # theta+tf.transformations.euler_from_quaternion(OFFSET.pose.orientation)[2] ]
 
                 # rospy.logwarn([ x+OFFSET.pose.position.x, y+OFFSET.pose.position.y, \
                       # theta+tf.transformations.euler_from_quaternion(OFFSET.pose.orientation)[2] ])
-               
-                self.waypoint_locations[int(tag_number)] = [x, y, theta]
-
+                rospy.logwarn(tag_number)
+                self.waypoint_locations[int(tag_number)] = self.add_offset(x, y, theta)
                 rospy.logwarn(self.waypoint_locations[int(tag_number)])
 
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
@@ -104,6 +98,13 @@ class Supervisor:
             self.bot_pose=np.array([trans[0], trans[1], wrapToPi(euler[2])])
 
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException): pass
+        rospy.logwarn(self.bot_pose)
+
+    def add_offset(self, x,y,th):
+        x=self.trans_listener.transformPose("/map", self.waypoint_offset).pose.position#, rospy.Time(0))
+        rot=self.trans_listener.transformPose("/map", self.waypoint_offset).pose.orientation
+        euler_off = tf.transformations.euler_from_quaternion((rot.x, rot.y, rot.z, rot.w))
+        return [x.x, x.y, euler_off[2]]
 
     def check_mode(self):
         all_tags_seen = True
@@ -140,11 +141,13 @@ class Supervisor:
 
             else: 
                 self.find_bot()
-                dist=np.linalg.norm(np.sum([self.bot_pose[:2], -self.current_g[:2]], axis=0)) #euclidian distance
+                #dist=np.linalg.norm(np.sum([self.bot_pose[:2], -self.current_g[:2]], axis=0)) #euclidian distance
+                dist=np.linalg.norm(np.array([self.bot_pose[0]-self.current_g[0], self.bot_pose[1]-self.current_g[1]]))
                 if dist<self.thresh:
                     rospy.logwarn('passed checkpoint')
                     self.step+=1
                     self.current_g=np.array(self.waypoint_locations[self.mission[self.step]])
+                    rospy.logwarn(self.current)
                 else:
                     rospy.logwarn('on the way')
                 
