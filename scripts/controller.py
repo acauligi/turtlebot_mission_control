@@ -76,11 +76,10 @@ class Controller:
         #else if same target
         #refer to a path where we remove points that have been visited?
         
-        
-        
         #the difficult part is choosing the right point on path to target, then just use code from hw1
         #here we look what point on path we are currently at, and target the next point along path
-        distances = [np.linalg.norm(pathlist[i]-np.array((self.x,self.y))) for i in range(n)] #get distances to all points on current path from astar
+        #the turtlebot will maintain a distance of about 1+0.5*resolution to 1-0.5*resolution from its goal point until the end.
+        distances = [np.linalg.norm(np.array((pathlist[i][0],pathlist[i][1]))-np.array((self.x,self.y))) for i in range(n)] #get distances to all points on current path from astar
         closest=distances.index(min(distances)) #index of closest point on path provided by astar
         if closest != len(pathlist)-1: #if the closest point on path is not the final goal target a point further along the path
             self.x_g=pathlist[closest+1][0]
