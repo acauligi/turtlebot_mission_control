@@ -67,7 +67,7 @@ class Navigator:
                 self.nav_sp = (msg.data[1][0],msg.data[1][1],msg.data[1][2])
                 self.update_path()
 
-            self.nav_path_pub.publish(self.current_path)
+        self.nav_path_pub.publish(self.current_path)
 
 
     def update_path(self):

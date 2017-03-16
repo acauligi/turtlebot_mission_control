@@ -24,16 +24,17 @@ class Controller:
         self.x_g = 0.0
         self.y_g = 0.0
         self.th_g = 0.0
+
+        self.pose_goal = None
+        self.path_list = None
+
+        rospy.Subscriber('/next_tag', Float32MultiArray, self.poseCallback()) #final pose to be acheived in front of apriltag because now care about orientation
+        rospy.Subscriber('/turtlebot_mission_control/path_goal', Path, self.pathCallback()) #a list of nodes computed using a*
 		
-		self.pose_goal = None
-		self.path_list = None
-		rospy.Subscriber('/next_tag', Float32MultiArray, self.poseCallback) #final pose to be acheived in front of apriltag because now care about orientation
-        rospy.Subscriber('/turtlebot_mission_control/path_goal', Path, self.pathCallback) #a list of nodes computed using a*
-		
-	def poseCallback(self, msg)
+	def poseCallback(self, msg):
 		self.pose_goal = msg.data[1] #for final pose in front of desired apriltag saved as a list [x,y,theta] this is goal right in front of apriltag
 		
-	def pathCallback(self, pathlist)
+	def pathCallback(self, pathlist):
 		self.path_list = pathlist #hopefully a list from astar such that path_list[i][0] is the x coord of ith point along path for example
 
     def get_ctrl_output(self):

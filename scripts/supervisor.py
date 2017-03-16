@@ -34,7 +34,7 @@ class Supervisor:
         rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.rviz_goal_callback)    # rviz "2D Nav Goal"
 
         self.mission=[]
-		rospy.Subscriber('/mission', Int32MultiArray, self.mission_callback)
+        rospy.Subscriber('/mission', Int32MultiArray, self.mission_callback)
 
         self.waypoint_locations = {}    # dictionary that caches the most updated locations of each mission waypoint
         self.waypoint_offset = PoseStamped()
@@ -47,6 +47,8 @@ class Supervisor:
 
         self.mode_pub = rospy.Publisher('/mission_mode', Float32MultiArray ,queue_size=10)
         self.tag_pub = rospy.Publisher('/next_tag', Float32MultiArray ,queue_size=10)
+
+        self.flag = 0 #exploration phase, no navigator
 
     def rviz_goal_callback(self, msg):
         self.next_goal=pose_to_xyth(msg.pose)
@@ -90,7 +92,7 @@ class Supervisor:
                 return msg
             else:
                 rospy.logwarn('on the way')
-                return msg=[0,0]
+                return [0,0] #msg = [0,0]
         rate.sleep()
 
     def explore(self):
@@ -98,24 +100,24 @@ class Supervisor:
         while not rospy.is_shutdown():
             self.update_waypoints()
             if self.check_mode():
-                flag=1
+                self.flag=1
                 loc= self.waypoint_locations[int(self.mission[0])] #first location to go to, ie first tag of mission execution
             else: 
-                flag=0
+                self.flag=0
                 loc=0
 
             msg=Float32MultiArray()
-            msg.data=[flag, loc]
+            msg.data=[self.flag, loc]
             return msg
 
             rate.sleep()
 
 if __name__ == '__main__':
     sup = Supervisor()
-    while flag==0: #exploration phase, no navigator
+    while sup.flag==0: #exploration phase, no navigator
         msg=sup.explore()
         self.mode_pub.publish(msg)
-        flag=msg.data[0]
+        sup.flag=msg.data[0]
 
     #now navigator kicks in:
     msg=sup.run()
