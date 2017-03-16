@@ -6,6 +6,10 @@ from geometry_msgs.msg import PoseStamped
 import tf
 import numpy as np
 
+#----------------------
+#input: bot pose, mission {list of int}
+#output: publish /mission_mode as a list of flaots (flag {0 or 1}, x, y, th)
+
 def pose_to_xyth(pose):
     th = tf.transformations.euler_from_quaternion((pose.orientation.x,
                                                    pose.orientation.y,
@@ -14,9 +18,8 @@ def pose_to_xyth(pose):
     return [pose.position.x, pose.position.y, th]
 def wrapToPi(a):
 	b = a
-	for i in range(len(a)):
-		if a[i] < -np.pi or a[i] > np.pi:
-			b[i] = ((a[i]+np.pi) % (2*np.pi)) - np.pi
+	if a< -np.pi or a> np.pi:
+		b = ((a+np.pi) % (2*np.pi)) - np.pi
 	return b
 
 
@@ -36,7 +39,7 @@ class Supervisor:
 
         self.mission=[]
         rospy.Subscriber('/mission', Int32MultiArray, self.mission_callback)
-        rospy.spin()
+        # rospy.spin()
 
         self.waypoint_locations = {}    # dictionary that caches the most updated locations of each mission waypoint
         self.waypoint_offset = PoseStamped()
@@ -52,12 +55,9 @@ class Supervisor:
 
         self.testing_pub = rospy.Publisher('/testingOnly', Float32MultiArray, queue_size=10)
 
-        self.flag = 0 #exploration phase, no navigator
-        self.loc = [0, 0, 0]
-
- 	self.current_g=-np.ones((1,3))
+        self.flag = 0. #exploration phase, no navigator
+        self.loc = [0., 0., 0.]
         self.thresh=0.01
-        self.step=0
 
     def rviz_goal_callback(self, msg):
         self.next_goal=pose_to_xyth(msg.pose)
@@ -108,14 +108,17 @@ class Supervisor:
     def check_mode(self):
         all_tags_seen = True
         # if not (tag in self.waypoint_locations.keys() for tag in self.mission):
-        if not any(self.mission):
-            all_tags_seen = False
-            return all_tags_seen
+        # if not any(self.mission):
+        #     all_tags_seen = False
+        #     return all_tags_seen
 
-        for tag in self.mission:
-            if not tag in self.waypoint_locations.keys():
-                all_tags_seen = False
-                return all_tags_seen
+        # for tag in self.mission:
+        #     if not tag in self.waypoint_locations.keys():
+        #         all_tags_seen = False
+        #         return all_tags_seen
+
+        if len(self.waypoint_locations.keys()) < 8:
+            all_tags_seen = False
 
         return all_tags_seen
 

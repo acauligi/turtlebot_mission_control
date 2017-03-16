@@ -61,7 +61,7 @@ class Navigator:
                                                   self.map_probs)
 
     def nav_sp_callback(self,msg):
-        if bool(round(msg.data[0])) == True
+        if bool(round(msg.data[0])) == True:
             self.execution_mode = True
             if msg.data[1] != self.nav_sp:
                 self.nav_sp = (msg.data[1][0],msg.data[1][1],msg.data[1][2])
