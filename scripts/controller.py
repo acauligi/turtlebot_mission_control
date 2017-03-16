@@ -25,6 +25,9 @@ class Controller:
         self.y_g = 0.0
         self.th_g = 0.0
 
+        # if being driven by user, use_controller = False
+        self.use_controller = False 
+
         self.pose_goal = None
         self.path_list = None
 
@@ -32,8 +35,14 @@ class Controller:
         rospy.Subscriber('/turtlebot_mission_control/path_goal', Path, self.pathCallback) #a list of nodes computed using a*
 		
 	def poseCallback(self, msg):
-        output = msg.data[1]
-		self.pose_goal = [output[1],output[2],output[3]] #for final pose in front of desired apriltag saved as a list [x,y,theta] this is goal right in front of apriltag
+        if msg.data[0] == True:
+            # robot autonomously drives
+            self.use_controller = True
+        else:
+            # i.e. still exploring so let user drive
+            self.use_controller = False
+
+		self.pose_goal = [msg.data[1], msg.data[2], msg.data[3]] #for final pose in front of desired apriltag saved as a list [x,y,theta] this is goal right in front of apriltag
 		
 	def pathCallback(self, pathlist):
 		self.path_list = pathlist #hopefully a list from astar such that path_list[i][0] is the x coord of ith point along path for example
@@ -89,22 +98,28 @@ class Controller:
         alpha=delta+self.th_g-self.theta
         delta=wrapToPi(delta)
         alpha=wrapToPi(alpha)
+        
         #Define control inputs (V,om) - without saturation constraints
         V=k1*rho*np.cos(alpha)
         om=k2*alpha+k1*np.sinc(alpha/np.pi)*np.cos(alpha)*(alpha+k3*delta)
+        
         # Divide by pi b/c sinc(x):=sin(pi*x)/(pi*x)
         # Apply saturation limits
         V = np.sign(V)*min(0.5, np.abs(V))
         om = np.sign(om)*min(1.0, np.abs(om))
+        
         #Make final check, if at the goal, just stop
         currentpos=np.array((self.x,self.y,self.theta))
         goalpos=np.array((self.pose_goal[0],self.pose_goal[1],self.pose_goal[2]))
+        
         reltol=0.000001 #very small percent relative tolerance since large numbers should not affect okay stopping area too much
         atol=0.01 #5cm absolute tolerance
+        
         if np.allclose(currentpos,goalpos,reltol,atol): #if our current position is our goal, or close enough, stop moving until different path is provided
             V=0.0
             om=0.0
-		#Package results into cmd
+		
+        #Package results into cmd
         cmd_x_dot = V
         cmd_theta_dot = om
 
@@ -117,7 +132,9 @@ class Controller:
         rate = rospy.Rate(10) # 10 Hz
         while not rospy.is_shutdown():
             ctrl_output = self.get_ctrl_output()
-            self.pub.publish(ctrl_output)
+
+            if self.use_controller:
+                self.pub.publish(ctrl_output)
             rate.sleep()
 
 if __name__ == '__main__':
