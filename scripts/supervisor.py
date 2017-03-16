@@ -59,16 +59,17 @@ class Supervisor:
 
     def rviz_goal_callback(self, msg):
         self.next_goal=pose_to_xyth(msg.pose)
-	rospy.logwarn("received")
+	    # rospy.logwarn("received")
 
     def mission_callback(self, msg):
         self.mission=msg.data
-	rospy.logwarn("received")
+	    # rospy.logwarn("received")
 	
     def update_waypoints(self):
-        for tag_number in self.mission: #range(8):
+        for tag_number in range(8): #self.mission:
             try:
                 self.waypoint_offset.header.frame_id = "/tag_{0}".format(tag_number)
+
                 (translation, rotation) = self.trans_listener.lookupTransform("/map", \
                     self.waypoint_offset.header.frame_id, rospy.Time(0))
 
@@ -77,8 +78,17 @@ class Supervisor:
                 euler = tf.transformations.euler_from_quaternion(rotation)
                 theta = euler[2]
 
-                self.waypoint_locations[int(tag_number)] = np.array([x, y, theta])
-                    #pose_to_xyth(self.trans_listener.transformPose("/map", self.waypoint_offset))
+                
+                # OFFSET = rospy.logwarn(self.trans_listener.transformPose("/map", self.waypoint_offset))
+
+
+                # self.waypoint_locations[int(tag_number)] = [ x+OFFSET.pose.position.x, y+OFFSET.pose.position.y, \
+                     # theta+tf.transformations.euler_from_quaternion(OFFSET.pose.orientation)[2] ]
+               
+                self.waypoint_locations[int(tag_number)] = [x, y, theta]
+
+                rospy.logwarn(self.waypoint_locations[int(tag_number)])
+
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                 pass
 
@@ -107,8 +117,9 @@ class Supervisor:
     def run(self):
         rate = rospy.Rate(1) # 1 Hz, change this to whatever you like
         while not rospy.is_shutdown():
-            rospy.logwarn(len(self.mission))
-            if self.flag==0:
+            # rospy.logwarn(len(self.mission))
+            if self.flag==0.0:
+                rospy.logwarn('in')
                 self.update_waypoints()
                 if self.check_mode():
                     self.flag=1
@@ -119,7 +130,7 @@ class Supervisor:
                 msg=Float32MultiArray()
                 msg.data=[self.flag] + loc
 
-            else:
+            else: 
                 self.find_bot()
                 dist=np.linalg.norm(np.sum([self.bot_pose[:2], -self.current_g[:2]], axis=0)) #euclidian distance
                 if dist<self.thresh:
@@ -131,7 +142,12 @@ class Supervisor:
                 
                 msg=Float32MultiArray()
                 tag=self.mission[len(self.been_at)-1]
-                msg.data=[self.flag, self.current_g]
+                msg.data=[self.flag] + self.current_g
+
+            tagsSeen = Float32MultiArray()
+            tagsSeen.data = self.waypoint_locations.keys()
+            self.testing_pub.publish(tagsSeen)
+            rate.sleep()
 
 #    def explore(self):
 #        rate = rospy.Rate(1) # 1 Hz, change this to whatever you like
