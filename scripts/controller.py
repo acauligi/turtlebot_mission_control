@@ -35,7 +35,7 @@ class Controller:
         rospy.Subscriber('/turtlebot_mission_control/path_goal', Path, self.pathCallback) #a list of nodes computed using a*
 		
 	def poseCallback(self, msg):
-        if msg.data[0] == True:
+        if bool(round(msg.data[0])) == True:
             # robot autonomously drives
             self.use_controller = True
         else:
@@ -131,9 +131,8 @@ class Controller:
     def run(self):
         rate = rospy.Rate(10) # 10 Hz
         while not rospy.is_shutdown():
-            ctrl_output = self.get_ctrl_output()
-
             if self.use_controller:
+                ctrl_output = self.get_ctrl_output()
                 self.pub.publish(ctrl_output)
             rate.sleep()
 
