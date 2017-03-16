@@ -28,7 +28,7 @@ class Navigator:
         self.map_probs = []
         self.occupancy = None
 
-        self.current_path = None
+        self.current_path = Path() #None
 
         self.nav_sp = None
         self.execution_mode = False
@@ -61,7 +61,7 @@ class Navigator:
                                                   self.map_probs)
 
     def nav_sp_callback(self,msg):
-        if msg.data[0] == 1:
+        if msg.data[0] == 1.0:
             self.execution_mode = True
             if msg.data[1] != self.nav_sp:
                 self.nav_sp = (msg.data[1][0],msg.data[1][1],msg.data[1][2])

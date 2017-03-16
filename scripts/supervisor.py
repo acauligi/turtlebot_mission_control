@@ -48,19 +48,37 @@ class Supervisor:
         self.mode_pub = rospy.Publisher('/mission_mode', Float32MultiArray ,queue_size=10)
         self.tag_pub = rospy.Publisher('/next_tag', Float32MultiArray ,queue_size=10)
 
+        self.testing_pub = rospy.Publisher('/testingOnly', Float32MultiArray, queue_size=10)
+
         self.flag = 0 #exploration phase, no navigator
+        self.loc = [0, 0, 0]
+
+ 	self.current_g=-np.ones((1,3))
+        self.thresh=0.01
+        self.step=0
 
     def rviz_goal_callback(self, msg):
         self.next_goal=pose_to_xyth(msg.pose)
+	rospy.logwarn("received")
 
     def mission_callback(self, msg):
         self.mission=msg.data
-		
+	rospy.logwarn("received")
+	
     def update_waypoints(self):
-        for tag_number in self.mission:
+        for tag_number in self.mission: #range(8):
             try:
                 self.waypoint_offset.header.frame_id = "/tag_{0}".format(tag_number)
-                self.waypoint_locations[int(tag_number)] = pose_to_xyth(self.trans_listener.transformPose("/map", self.waypoint_offset))
+                (translation, rotation) = self.trans_listener.lookupTransform("/map", \
+                    self.waypoint_offset.header.frame_id, rospy.Time(0))
+
+                x = translation[0]
+                y = translation[1]
+                euler = tf.transformations.euler_from_quaternion(rotation)
+                theta = euler[2]
+
+                self.waypoint_locations[int(tag_number)] = np.array([x, y, theta])
+                    #pose_to_xyth(self.trans_listener.transformPose("/map", self.waypoint_offset))
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                 pass
 
@@ -73,56 +91,86 @@ class Supervisor:
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException): pass
 
     def check_mode(self):
-        all_tags_seen=True
-        if not (tag in self.waypoint_locations for tag in self.mission) : all_tags_seen=False
+        all_tags_seen = True
+        # if not (tag in self.waypoint_locations.keys() for tag in self.mission):
+        if not any(self.mission):
+            all_tags_seen = False
+            return all_tags_seen
+
+        for tag in self.mission:
+            if not tag in self.waypoint_locations.keys():
+                all_tags_seen = False
+                return all_tags_seen
+
         return all_tags_seen
 
     def run(self):
         rate = rospy.Rate(1) # 1 Hz, change this to whatever you like
         while not rospy.is_shutdown():
-            self.find_bot()
-            if all(self.bot_pose==self.next_goal):
-                rospy.logwarn('passed checkpoint')
-                if all(self.next_goal==coord for tags, coord in zip(self.waypoint_loctaions.keys(), self.waypoint_locations.values()) ):
-                    tag=tags
-                self.been_at.append(int(tag))
+            rospy.logwarn(len(self.mission))
+            if self.flag==0:
+                self.update_waypoints()
+                if self.check_mode():
+                    self.flag=1
+                    loc= self.waypoint_locations[self.mission[self.step]] #first location to go to, ie first tag of mission execution
+                else: 
+                    loc=[0,0,0]
 
                 msg=Float32MultiArray()
-                msg.data=[self.mission(len(self.been_at)-1), self.waypoint_locations[tag]]
-                return msg
+                msg.data=[self.flag] + loc
+
             else:
-                rospy.logwarn('on the way')
-                return [0,0] #msg = [0,0]
-        rate.sleep()
+                self.find_bot()
+                dist=np.linalg.norm(np.sum([self.bot_pose[:2], -self.current_g[:2]], axis=0)) #euclidian distance
+                if dist<self.thresh:
+                    rospy.logwarn('passed checkpoint')
+                    self.step+=1
+                    self.current_g=np.array(self.waypoint_locations[self.mission[self.step]])
+                else:
+                    rospy.logwarn('on the way')
+                
+                msg=Float32MultiArray()
+                tag=self.mission[len(self.been_at)-1]
+                msg.data=[self.flag, self.current_g]
 
-    def explore(self):
-        rate = rospy.Rate(1) # 1 Hz, change this to whatever you like
-        while not rospy.is_shutdown():
-            self.update_waypoints()
-            if self.check_mode():
-                self.flag=1
-                loc= self.waypoint_locations[int(self.mission[0])] #first location to go to, ie first tag of mission execution
-            else: 
-                self.flag=0
-                loc=0
+#    def explore(self):
+#        rate = rospy.Rate(1) # 1 Hz, change this to whatever you like
+#        while not rospy.is_shutdown():
+#            self.update_waypoints()
+#            if self.check_mode(): #first location to go to, ie first tag of mission execution
+#                self.flag = 1.0
+#                self.loc = self.waypoint_locations[int(self.mission[0])]
+#            else: 
+#                self.flag = 0.0
+#                self.loc = [0, 0, 0]
 
-            msg=Float32MultiArray()
-            msg.data=[self.flag, loc]
-            return msg
-
-            rate.sleep()
+#            msg=Float32MultiArray()
+#            msg.data=[self.flag] + self.loc
+#            rate.sleep()
+#            return msg
 
 if __name__ == '__main__':
     sup = Supervisor()
-    while sup.flag==0: #exploration phase, no navigator
-        msg=sup.explore()
-        self.mode_pub.publish(msg)
-        sup.flag=msg.data[0]
+    sup.run()
+#    while sup.flag == 0.0: #exploration phase, no navigator
+#        msg=sup.explore()
+#        sup.mode_pub.publish(msg)
+#        sup.flag=msg.data[0]
 
-    #now navigator kicks in:
-    msg=sup.run()
-    if not all(msg == [0,0]):
-        self.tag_pub.publish(msg)
+#        tagsSeen = Float32MultiArray()
+#        tagsSeen.data = sup.waypoint_locations.keys()
+#        sup.testing_pub.publish(tagsSeen)
+
+#    rate = rospy.Rate(1)
+#    while sup.flag == 1.0:
+#        msg.data = [self.flag, self.loc]
+#        sup.mode_pub.publish(msg)
+#        rospy.sleep()
+
+#     now navigator kicks in:
+#     msg=sup.run()
+#     if not np.array_equal(msg, [0.0,0.0]):
+#         sup.tag_pub.publish(msg)
 
 
 
