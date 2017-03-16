@@ -12,12 +12,14 @@ def pose_to_xyth(pose):
                                                    pose.orientation.z,
                                                    pose.orientation.w))[2]
     return [pose.position.x, pose.position.y, th]
+
+
 def wrapToPi(a):
-	b = a
-	for i in range(len(a)):
-		if a[i] < -np.pi or a[i] > np.pi:
-			b[i] = ((a[i]+np.pi) % (2*np.pi)) - np.pi
-	return b
+    b = a
+    for i in range(len(a)):
+        if a[i] < -np.pi or a[i] > np.pi:
+            b[i] = ((a[i]+np.pi) % (2*np.pi)) - np.pi
+    return b
 
 
 class Supervisor:
@@ -33,9 +35,7 @@ class Supervisor:
         self.next_goal=[]
         rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.rviz_goal_callback)    # rviz "2D Nav Goal"
 
-        self.mission=[]
-        rospy.Subscriber('/mission', Int32MultiArray, self.mission_callback)
-
+        self.mission=[1,2,3]
         self.waypoint_locations = {}    # dictionary that caches the most updated locations of each mission waypoint
         self.waypoint_offset = PoseStamped()
         self.waypoint_offset.pose.position.z = .4    # waypoint is located 40cm in front of the AprilTag, facing it
@@ -46,13 +46,18 @@ class Supervisor:
         self.waypoint_offset.pose.orientation.w = quat[3]
 
         self.mode_pub = rospy.Publisher('/mission_mode', Float32MultiArray ,queue_size=10)
-        self.tag_pub = rospy.Publisher('/next_tag', Float32MultiArray ,queue_size=10)
+        self.flag=0
+        #self.tag_pub = rospy.Publisher('/next_tag', Float32MultiArray ,queue_size=10)
 
     def rviz_goal_callback(self, msg):
         self.next_goal=pose_to_xyth(msg.pose)
 
+    def get_mission(self):
+        rospy.Subscriber('/mission', Int32MultiArray, self.mission_callback)
+
     def mission_callback(self, msg):
         self.mission=msg.data
+        rospy.loginfo(msg.data)
 		
     def update_waypoints(self):
         for tag_number in self.mission:
@@ -79,7 +84,7 @@ class Supervisor:
         rate = rospy.Rate(1) # 1 Hz, change this to whatever you like
         while not rospy.is_shutdown():
             self.find_bot()
-            dist=np.linalg.norm([np.sum([np.array(self.bot_pose[:2]), -np.array(self.next_goal[:2])], axis=0)) #euclidian distance
+            dist=1#np.linalg.norm([np.sum([np.array(self.bot_pose[:2]), -np.array(self.next_goal[:2])], axis=0)) #euclidian distance
             if dist<thresh:
                 rospy.logwarn('passed checkpoint')
                 if all(self.next_goal==coord for tag_nbrs, coord in zip(self.waypoint_loctaions.keys(), self.waypoint_locations.values())):
@@ -88,34 +93,35 @@ class Supervisor:
             else:
                 rospy.logwarn('on the way')
                 
-        msg=Float32MultiArray()
-        tag=self.mission[len(self.been_at)-1]
-        msg.data=[1, self.waypoint_locations[tag]]
+            msg=Float32MultiArray()
+            tag=self.mission[len(self.been_at)-1]
+            msg.data=[1, self.waypoint_locations[tag]]
 
-        return msg
-        rate.sleep()
+            return msg
+            rate.sleep()
 
     def explore(self):
         rate = rospy.Rate(1) # 1 Hz, change this to whatever you like
         while not rospy.is_shutdown():
             self.update_waypoints()
             if self.check_mode():
-                flag=1
-                loc= self.waypoint_locations[int(self.mission[0])] #first location to go to, ie first tag of mission execution
+                self.flag=1
+                loc= self.waypoint_locations[self.mission[0]] #first location to go to, ie first tag of mission execution
             else: 
-                flag=0
-                loc=0
+                self.flag=0
+                loc=[0,0,0]
 
             msg=Float32MultiArray()
-            msg.data=[flag, loc]
+            msg.data=[self.flag, loc]
             return msg
 
             rate.sleep()
 
 if __name__ == '__main__':
     sup = Supervisor()
-    flag=0
-    while flag==0: #exploration phase, no navigator
+    sup.get_mission()
+    flag=self.flag
+    if flag==0: #exploration phase, no navigator
         msg=sup.explore()
         self.mode_pub.publish(msg)
         flag=msg.data[0]
