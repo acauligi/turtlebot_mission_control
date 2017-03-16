@@ -5,6 +5,7 @@ from std_msgs.msg import Int32MultiArray, Float32MultiArray, String
 from geometry_msgs.msg import PoseStamped
 import tf
 import numpy as np
+import pdb
 
 def pose_to_xyth(pose):
     th = tf.transformations.euler_from_quaternion((pose.orientation.x,
@@ -31,11 +32,15 @@ class Supervisor:
         self.bot_pose=np.array([0., 0., 0.])# x, y, th
 
         #relevant i execution phase
-        self.been_at=[]
         self.next_goal=[]
         rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.rviz_goal_callback)    # rviz "2D Nav Goal"
+        self.mission=[]
+        a=len(self.mission)
+        while a==0:
+            rospy.Subscriber('/mission', Int32MultiArray, self.mission_callback)
+            rospy.spin()
+            a=len(self.mission)
 
-        self.mission=[1,2,3]
         self.waypoint_locations = {}    # dictionary that caches the most updated locations of each mission waypoint
         self.waypoint_offset = PoseStamped()
         self.waypoint_offset.pose.position.z = .4    # waypoint is located 40cm in front of the AprilTag, facing it
@@ -47,17 +52,19 @@ class Supervisor:
 
         self.mode_pub = rospy.Publisher('/mission_mode', Float32MultiArray ,queue_size=10)
         self.flag=0
+        self.current_g=-np.ones((1,3))
+        self.thresh=0.01
+        self.step=0
         #self.tag_pub = rospy.Publisher('/next_tag', Float32MultiArray ,queue_size=10)
+
 
     def rviz_goal_callback(self, msg):
         self.next_goal=pose_to_xyth(msg.pose)
-
-    def get_mission(self):
-        rospy.Subscriber('/mission', Int32MultiArray, self.mission_callback)
+        rospy.logwarn("recieved")
 
     def mission_callback(self, msg):
         self.mission=msg.data
-        rospy.loginfo(msg.data)
+        rospy.logwarn("recieved")
 		
     def update_waypoints(self):
         for tag_number in self.mission:
@@ -80,55 +87,42 @@ class Supervisor:
         if not (tag in self.waypoint_locations for tag in self.mission) : all_tags_seen=False
         return all_tags_seen
 
-    def run(self, thresh):
+    def run(self):
         rate = rospy.Rate(1) # 1 Hz, change this to whatever you like
         while not rospy.is_shutdown():
-            self.find_bot()
-            dist=1#np.linalg.norm([np.sum([np.array(self.bot_pose[:2]), -np.array(self.next_goal[:2])], axis=0)) #euclidian distance
-            if dist<thresh:
-                rospy.logwarn('passed checkpoint')
-                if all(self.next_goal==coord for tag_nbrs, coord in zip(self.waypoint_loctaions.keys(), self.waypoint_locations.values())):
-                     tag=tag_nbrs
-                self.been_at.append(int(tag))
+            rospy.logwarn(len(self.mission))
+            if self.flag==0:
+                self.update_waypoints()
+                if self.check_mode():
+                    self.flag=1
+                    loc= self.waypoint_locations[self.mission[self.step]] #first location to go to, ie first tag of mission execution
+                else: 
+                    loc=[0,0,0]
+
+                msg=Float32MultiArray()
+                msg.data=[self.flag, loc]
+
             else:
-                rospy.logwarn('on the way')
+                self.find_bot()
+                dist=np.linalg.norm(np.sum([self.bot_pose[:2], -self.current_g[:2]], axis=0)) #euclidian distance
+                if dist<self.thresh:
+                    rospy.logwarn('passed checkpoint')
+                    self.step+=1
+                    self.current_g=np.array(self.waypoint_locations[self.mission[self.step]])
+                else:
+                    rospy.logwarn('on the way')
                 
-            msg=Float32MultiArray()
-            tag=self.mission[len(self.been_at)-1]
-            msg.data=[1, self.waypoint_locations[tag]]
+                msg=Float32MultiArray()
+                tag=self.mission[len(self.been_at)-1]
+                msg.data=[self.flag, self.current_g]
 
-            return msg
-            rate.sleep()
-
-    def explore(self):
-        rate = rospy.Rate(1) # 1 Hz, change this to whatever you like
-        while not rospy.is_shutdown():
-            self.update_waypoints()
-            if self.check_mode():
-                self.flag=1
-                loc= self.waypoint_locations[self.mission[0]] #first location to go to, ie first tag of mission execution
-            else: 
-                self.flag=0
-                loc=[0,0,0]
-
-            msg=Float32MultiArray()
-            msg.data=[self.flag, loc]
-            return msg
-
+            
+            self.mode_pub.publish(msg)
             rate.sleep()
 
 if __name__ == '__main__':
     sup = Supervisor()
-    sup.get_mission()
-    flag=self.flag
-    if flag==0: #exploration phase, no navigator
-        msg=sup.explore()
-        self.mode_pub.publish(msg)
-        flag=msg.data[0]
-
-    #now navigator kicks in:
-    msg=sup.run(0.01)
-    self.mode_pub.publish(msg)
+    sup.run()
 
 
 
