@@ -1,5 +1,13 @@
 #!/usr/bin/env python
-
+#INPUTS:
+#From /mission_mode expects [float32, float32, float32, float32]
+#     where elements are [explore or mission(0 or 1), x location of current goal, y loc of current goal, theta of current goal]
+#From /turtlebot_mission_control/path_goal expects list of floats. List dimensions of 2 rows and unknown columns depending on path length. Cannot be an empty list.
+#     where elements look like [[x1,y1],[x2,y2],[x3,y3],...,[x_goal,y_goal]]
+#
+#OUTPUTS:
+#To cmd_vel_mux/input/navi publishes a cmd = Twist() where cmd.linear.x is the velocity and cmd.angular.z is rotation
+#goes to turtlebot, probably overriden when keyop is in use.
 import rospy
 from std_msgs.msg import Float32MultiArray
 from gazebo_msgs.msg import ModelStates
@@ -35,11 +43,11 @@ class Controller:
         rospy.Subscriber('/turtlebot_mission_control/path_goal', Path, self.pathCallback) #a list of nodes computed using a*
 		
 	def poseCallback(self, msg):
-        if bool(round(msg.data[0])) == True:
+        if bool(round(msg.data[0])) == True: #if mission mode is in 1 (or True or Mission) then
             # robot autonomously drives
             self.use_controller = True
         else:
-            # i.e. still exploring so let user drive
+            # i.e. still exploring so let user drive, will not publish a control
             self.use_controller = False
 
 		self.pose_goal = [msg.data[1], msg.data[2], msg.data[3]] #for final pose in front of desired apriltag saved as a list [x,y,theta] this is goal right in front of apriltag
@@ -68,11 +76,10 @@ class Controller:
         #else if same target
         #refer to a path where we remove points that have been visited?
         
-        
-        
         #the difficult part is choosing the right point on path to target, then just use code from hw1
         #here we look what point on path we are currently at, and target the next point along path
-        distances = [np.linalg.norm(pathlist[i]-np.array((self.x,self.y))) for i in range(n)] #get distances to all points on current path from astar
+        #the turtlebot will maintain a distance of about 1+0.5*resolution to 1-0.5*resolution from its goal point until the end.
+        distances = [np.linalg.norm(np.array((pathlist[i][0],pathlist[i][1]))-np.array((self.x,self.y))) for i in range(n)] #get distances to all points on current path from astar
         closest=distances.index(min(distances)) #index of closest point on path provided by astar
         if closest != len(pathlist)-1: #if the closest point on path is not the final goal target a point further along the path
             self.x_g=pathlist[closest+1][0]
@@ -113,7 +120,7 @@ class Controller:
         goalpos=np.array((self.pose_goal[0],self.pose_goal[1],self.pose_goal[2]))
         
         reltol=0.000001 #very small percent relative tolerance since large numbers should not affect okay stopping area too much
-        atol=0.01 #5cm absolute tolerance
+        atol=0.02 #2cm absolute tolerance
         
         if np.allclose(currentpos,goalpos,reltol,atol): #if our current position is our goal, or close enough, stop moving until different path is provided
             V=0.0
@@ -131,9 +138,10 @@ class Controller:
     def run(self):
         rate = rospy.Rate(10) # 10 Hz
         while not rospy.is_shutdown():
-            if self.use_controller:
+            if self.use_controller: #if we want to use autonomous controller, (not human controlled), publish the autonomous control outputs
                 ctrl_output = self.get_ctrl_output()
                 self.pub.publish(ctrl_output)
+            #if we are in user control mode nothing is published since keyop is in control
             rate.sleep()
 
 if __name__ == '__main__':
