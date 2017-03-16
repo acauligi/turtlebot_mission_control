@@ -29,12 +29,14 @@ class Supervisor:
         self.bot_pose=np.array([0., 0., 0.])# x, y, th
 
         #relevant i execution phase
-        self.been_at=[]
-        self.next_goal=[]
+        self.current_g=-np.ones((1,3))
+        self.step=0
+        #self.next_goal=[]
         rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.rviz_goal_callback)    # rviz "2D Nav Goal"
 
         self.mission=[]
         rospy.Subscriber('/mission', Int32MultiArray, self.mission_callback)
+        rospy.spin()
 
         self.waypoint_locations = {}    # dictionary that caches the most updated locations of each mission waypoint
         self.waypoint_offset = PoseStamped()
@@ -125,10 +127,10 @@ class Supervisor:
                 rospy.logwarn('in')
                 self.update_waypoints()
                 if self.check_mode():
-                    self.flag=1
+                    self.flag=1.
                     loc= self.waypoint_locations[self.mission[self.step]] #first location to go to, ie first tag of mission execution
                 else: 
-                    loc=[0,0,0]
+                    loc=[0.,0.,0.]
 
                 msg=Float32MultiArray()
                 msg.data=[self.flag] + loc
@@ -144,10 +146,10 @@ class Supervisor:
                     rospy.logwarn('on the way')
                 
                 msg=Float32MultiArray()
-                tag=self.mission[len(self.been_at)-1]
+                #tag=self.mission[len(self.been_at)-1]
                 msg.data=[self.flag] + self.current_g
 
-            #self.mode_pub.publish(msg)
+            self.mode_pub.publish(msg)
 
             tagsSeen = Float32MultiArray()
             tagsSeen.data = self.waypoint_locations.keys()
@@ -173,25 +175,3 @@ class Supervisor:
 if __name__ == '__main__':
     sup = Supervisor()
     sup.run()
-#    while sup.flag == 0.0: #exploration phase, no navigator
-#        msg=sup.explore()
-#        sup.mode_pub.publish(msg)
-#        sup.flag=msg.data[0]
-
-#        tagsSeen = Float32MultiArray()
-#        tagsSeen.data = sup.waypoint_locations.keys()
-#        sup.testing_pub.publish(tagsSeen)
-
-#    rate = rospy.Rate(1)
-#    while sup.flag == 1.0:
-#        msg.data = [self.flag, self.loc]
-#        sup.mode_pub.publish(msg)
-#        rospy.sleep()
-
-#     now navigator kicks in:
-#     msg=sup.run()
-#     if not np.array_equal(msg, [0.0,0.0]):
-#         sup.tag_pub.publish(msg)
-
-
-
