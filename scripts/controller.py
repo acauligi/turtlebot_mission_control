@@ -94,8 +94,8 @@ class Controller:
             self.y_g=self.pathlist[closest+1][1]
             self.th_g=np.arctan2(self.pathlist[closest+1][1]-self.pathlist[closest][1],self.pathlist[closest+1][0]-self.pathlist[closest][0]) #make it parallel to current path(line segment) we are on
             #we use separate gains based on our situation, less worried about approaching a final goal here so k3 is low
-            k1=0.6
-            k2=30.0
+            k1=0.4
+            k2=1.
             k3=0.01
             rospy.loginfo("Following Path.")
         else: #if the closest point is the final goal of the path just go there
@@ -105,8 +105,8 @@ class Controller:
             self.th_g=self.pose_goal[2]
             #actually want to park so concerned about orientation, less about speed or staying on line near our goal, use defaults from the homework
             k1=0.4
-            k2=0.8
-            k3=0.8
+            k2=.5
+            k3=0.2
             rospy.loginfo("Approaching End of Path!")
 			
 		#assume we are close enough that our pose controller from hw1 will function properly
@@ -122,15 +122,15 @@ class Controller:
         
         # Divide by pi b/c sinc(x):=sin(pi*x)/(pi*x)
         # Apply saturation limits
-        V = np.sign(V)*min(0.5, np.abs(V))
-        om = np.sign(om)*min(2.0, np.abs(om))
+        V = np.sign(V)*min(0.15, np.abs(V))
+        om = np.sign(om)*min(0.9, np.abs(om))
         
         #Make final check, if at the goal, just stop
         currentpos=np.array((self.x,self.y))
         goalpos=np.array((self.pose_goal[0],self.pose_goal[1]))
         
         reltol=0.000001 #very small percent relative tolerance since large numbers should not affect okay stopping area too much
-        linatol=0.02 #2cm absolute linear tolerance
+        linatol=0.05 #2cm absolute linear tolerance
         angatol=0.17 #absolute angular tolerance in radians, 0.17 rad~10 deg
         
         #if our current position is our goal, or close enough, stop moving until different path is provided

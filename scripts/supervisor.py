@@ -130,12 +130,15 @@ class Supervisor:
                     rospy.logwarn('passed checkpoint')
                     self.step+=1
                     self.current_g=np.array(self.waypoint_locations[self.mission[self.step]])
-                    rospy.logwarn(self.current)
+                    rospy.logwarn(self.current_g)
                 else:
                     rospy.logwarn('on the way')
                 
                 msg=Float32MultiArray()
-                msg.data = [self.flag, self.current_g[0], self.current_g[1], self.current_g[2]] 
+                msg.data = [self.flag, self.current_g[0], self.current_g[1], self.current_g[2]]
+
+            if self.step==len(self.mission):
+                msg.data=[0., 0., 0., 0.]
 
             self.mode_pub.publish(msg)
 
