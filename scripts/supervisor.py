@@ -57,7 +57,7 @@ class Supervisor:
 
         self.flag = 0. #exploration phase, no navigator
         self.loc = [0., 0., 0.]
-        self.thresh=0.01
+        self.thresh=0.1
 
     def rviz_goal_callback(self, msg):
         self.next_goal=pose_to_xyth(msg.pose)
@@ -68,7 +68,7 @@ class Supervisor:
 	    # rospy.logwarn("received")
 	
     def update_waypoints(self):
-        for tag_number in range(8): #self.mission:
+        for tag_number in range(8):
             try:
                 self.waypoint_offset.header.frame_id = "/tag_{0}".format(tag_number)
 
@@ -78,16 +78,8 @@ class Supervisor:
                 y = translation[1]
                 euler = tf.transformations.euler_from_quaternion(rotation)
                 theta = euler[2]
-
-                # self.waypoint_locations[int(tag_number)] = [ x+OFFSET.pose.position.x, y+OFFSET.pose.position.y, \
-                     # theta+tf.transformations.euler_from_quaternion(OFFSET.pose.orientation)[2] ]
-
-                # rospy.logwarn([ x+OFFSET.pose.position.x, y+OFFSET.pose.position.y, \
-                      # theta+tf.transformations.euler_from_quaternion(OFFSET.pose.orientation)[2] ])
-               
-
+                
                 self.waypoint_locations[int(tag_number)] = [x, y, theta]
-
 
                 rospy.logwarn(tag_number)
                 self.waypoint_locations[int(tag_number)] = self.add_offset(x, y, theta)
@@ -112,23 +104,6 @@ class Supervisor:
         euler_off = tf.transformations.euler_from_quaternion((rot.x, rot.y, rot.z, rot.w))
         return [x.x, x.y, euler_off[2]]
 
-    def check_mode(self):
-        all_tags_seen = True
-        # if not (tag in self.waypoint_locations.keys() for tag in self.mission):
-        # if not any(self.mission):
-        #     all_tags_seen = False
-        #     return all_tags_seen
-
-        # for tag in self.mission:
-        #     if not tag in self.waypoint_locations.keys():
-        #         all_tags_seen = False
-        #         return all_tags_seen
-
-        if len(self.waypoint_locations.keys()) < 8: 
-            all_tags_seen = False
-
-        return all_tags_seen
-
     def run(self):
         rate = rospy.Rate(1) # 1 Hz, change this to whatever you like
         while not rospy.is_shutdown():
@@ -136,8 +111,7 @@ class Supervisor:
             self.update_waypoints()
             if self.flag==0.0:
                 rospy.logwarn('in')
-                #self.update_waypoints()
-                if self.check_mode():
+                if len(self.waypoint_locations.keys()) == 8: 
                     self.flag=1.
                     loc= self.waypoint_locations[self.mission[0]] #first location to go to, ie first tag of mission execution
                     self.current_g=np.array(self.waypoint_locations[self.mission[0]])
@@ -150,7 +124,6 @@ class Supervisor:
                 rospy.logwarn('1')
                 self.find_bot()
 
-                #dist=np.linalg.norm(np.sum([self.bot_pose[:2], -self.current_g[:2]], axis=0)) #euclidian distance
                 dist=np.linalg.norm(np.array([self.bot_pose[0]-self.current_g[0], self.bot_pose[1]-self.current_g[1]]))
 
                 if dist<self.thresh:
@@ -162,7 +135,6 @@ class Supervisor:
                     rospy.logwarn('on the way')
                 
                 msg=Float32MultiArray()
-                #tag=self.mission[len(self.been_at)-1]
                 msg.data = [self.flag, self.current_g[0], self.current_g[1], self.current_g[2]] 
 
             self.mode_pub.publish(msg)
@@ -171,22 +143,6 @@ class Supervisor:
             tagsSeen.data = self.waypoint_locations.keys()
             self.testing_pub.publish(tagsSeen)
             rate.sleep()
-
-#    def explore(self):
-#        rate = rospy.Rate(1) # 1 Hz, change this to whatever you like
-#        while not rospy.is_shutdown():
-#            self.update_waypoints()
-#            if self.check_mode(): #first location to go to, ie first tag of mission execution
-#                self.flag = 1.0
-#                self.loc = self.waypoint_locations[int(self.mission[0])]
-#            else: 
-#                self.flag = 0.0
-#                self.loc = [0, 0, 0]
-
-#            msg=Float32MultiArray()
-#            msg.data=[self.flag] + self.loc
-#            rate.sleep()
-#            return msg
 
 if __name__ == '__main__':
     sup = Supervisor()
