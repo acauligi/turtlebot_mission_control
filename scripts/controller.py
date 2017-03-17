@@ -47,6 +47,7 @@ class Controller:
         # robot autonomously drives
         if bool(round(msg.data[0])) == True: #if mission mode is in 1 (or True or Mission) then
             self.use_controller = True
+            rospy.loginfo_throttle(10,"Robot is driving autonomously!")
         else:
             self.use_controller = False
         # i.e. still exploring so let user drive, will not publish a control
@@ -90,6 +91,7 @@ class Controller:
             k1=0.6
             k2=30.0
             k3=0.01
+            rospy.loginfo("Following Path.")
         else: #if the closest point is the final goal of the path just go there
             #pose position and orientations according to the topic publishing april_tag info directly.
             self.x_g=self.pose_goal[0]
@@ -99,6 +101,7 @@ class Controller:
             k1=0.4
             k2=0.8
             k3=0.8
+            rospy.loginfo("Approaching End of Path!")
 			
 		#assume we are close enough that our pose controller from hw1 will function properly
         rho=np.sqrt((self.x-self.x_g)**2 + (self.y-self.y_g)**2)
@@ -117,15 +120,18 @@ class Controller:
         om = np.sign(om)*min(1.0, np.abs(om))
         
         #Make final check, if at the goal, just stop
-        currentpos=np.array((self.x,self.y,self.theta))
-        goalpos=np.array((self.pose_goal[0],self.pose_goal[1],self.pose_goal[2]))
+        currentpos=np.array((self.x,self.y))
+        goalpos=np.array((self.pose_goal[0],self.pose_goal[1]))
         
         reltol=0.000001 #very small percent relative tolerance since large numbers should not affect okay stopping area too much
-        atol=0.02 #2cm absolute tolerance
+        linatol=0.02 #2cm absolute linear tolerance
+        angatol=0.17 #absolute angular tolerance in radians, 0.17 rad~10 deg
         
-        if np.allclose(currentpos,goalpos,reltol,atol): #if our current position is our goal, or close enough, stop moving until different path is provided
+        #if our current position is our goal, or close enough, stop moving until different path is provided
+        if np.allclose(currentpos,goalpos,reltol,linatol) and np.isclose(self.theta,self.pose_goal[2],reltol,angatol):
             V=0.0
             om=0.0
+            rospy.logwarn("Arriving at Goal: Stopping until goal is changed.")
 		
         #Package results into cmd
         cmd_x_dot = V
