@@ -35,25 +35,29 @@ class AStar(object):
     def snap_to_grid(self, xy, resolution):
         return (resolution*round(xy[0]/resolution), resolution*round(xy[1]/resolution))
 
-    def is_free(self, x):
-        if x==self.x_init or x==self.x_goal:
-            return True
-        for dim in range(len(x)):
-            if x[dim] < self.statespace_lo[dim]:
-                return False
-            if x[dim] >= self.statespace_hi[dim]:
-                return False
-        if not self.occupancy.is_free(x):
-            return False
-        # thetas = np.arange(0, 2*pi, pi/10)
-        # x_here = deepcopy(x)
-        # for theta in thetas:
-        #     x_here[0] = x + self.kobuki_radius*cos(theta)
-        #     x_here[1] = x + self.kobuki_radius*sin(theta)
+    def get_neighbors(self, x):
+        # TODO: fill me in!
+        neighbor_list = []
 
-        #     if not self.occupancy.is_free(x_here):
-        #         return False
-        return True
+        for dx in [-1., 0., 1.]:
+            for dy in [-1., 0., 1.]:
+                if dx != 0 or dy != 0:
+                    nn = (x[0] + dx*self.resolution, x[1] + dy*self.resolution)
+                    nn = self.snap_to_grid(nn, self.resolution)
+                    dir = np.array([dx, dy])/np.linalg.norm(np.array([dx, dy]))
+                    nn_left = (nn[0] - dir[1]*self.tb_radius, nn[1] + dir[0]*self.tb_radius)
+                    nn_left = self.snap_to_grid(nn_left, self.resolution)
+
+                    nn_top = (nn[0] + dir[0]*self.tb_radius, nn[1] + dir[1]*self.tb_radius)
+                    nn_top = self.snap_to_grid(nn_top, self.resolution)
+
+                    nn_right = (nn[0] + dir[1]*self.tb_radius, nn[1] - dir[0]*self.tb_radius)
+                    nn_right = self.snap_to_grid(nn_right, self.resolution)
+
+                    if self.is_free(nn) and self.is_free(nn_left) and self.is_free(nn_top) and self.is_free(nn_right):
+                        neighbor_list.append(nn)
+
+        return neighbor_list
 
     # computes the euclidean distance between two states
     # INPUT: (x1, x2)
