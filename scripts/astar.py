@@ -48,15 +48,16 @@ class AStar(object):
                 return False
             if x[dim] >= self.statespace_hi[dim]:
                 return False
+        if not self.occupancy.is_free(x):
+            return False
+        # thetas = np.arange(0, 2*pi, pi/10)
+        # x_here = deepcopy(x)
+        # for theta in thetas:
+        #     x_here[0] = x + self.kobuki_radius*cos(theta)
+        #     x_here[1] = x + self.kobuki_radius*sin(theta)
 
-        thetas = np.arange(0, 2*pi, pi/10)
-        x_here = deepcopy(x)
-        for theta in thetas:
-            x_here[0] = x + self.kobuki_radius*cos(theta)
-            x_here[1] = x + self.kobuki_radius*sin(theta)
-
-            if not self.occupancy.is_free(x_here):
-                return False
+        #     if not self.occupancy.is_free(x_here):
+        #         return False
         return True
 
     # computes the euclidean distance between two states

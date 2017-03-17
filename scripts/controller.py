@@ -10,6 +10,7 @@
 #goes to turtlebot, probably overriden when keyop is in use.
 import rospy
 from std_msgs.msg import Float32MultiArray
+from nav_msgs.msg import Path
 from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
 import tf
@@ -37,23 +38,23 @@ class Controller:
         self.use_controller = False 
 
         self.pose_goal = None
-        self.path_list = None
+        self.pathlist = Path()
 
         rospy.Subscriber('/mission_mode', Float32MultiArray, self.poseCallback) #final pose to be acheived in front of apriltag because now care about orientation
         rospy.Subscriber('/turtlebot_mission_control/path_goal', Path, self.pathCallback) #a list of nodes computed using a*
 		
-	def poseCallback(self, msg):
+    def poseCallback(self, msg):
+        # robot autonomously drives
         if bool(round(msg.data[0])) == True: #if mission mode is in 1 (or True or Mission) then
-            # robot autonomously drives
             self.use_controller = True
         else:
-            # i.e. still exploring so let user drive, will not publish a control
             self.use_controller = False
+        # i.e. still exploring so let user drive, will not publish a control
 
-		self.pose_goal = [msg.data[1], msg.data[2], msg.data[3]] #for final pose in front of desired apriltag saved as a list [x,y,theta] this is goal right in front of apriltag
-		
-	def pathCallback(self, pathlist):
-		self.path_list = pathlist #hopefully a list from astar such that path_list[i][0] is the x coord of ith point along path for example
+        self.pose_goal = [msg.data[1], msg.data[2], msg.data[3]] #for final pose in front of desired apriltag saved as a list [x,y,theta] this is goal right in front of apriltag
+
+    def pathCallback(self, msg):
+        self.pathlist = msg #hopefully a list from astar such that pathlist[i][0] is the x coord of ith point along path for example
 
     def get_ctrl_output(self):
         #Get current position and assign to self.x,y, and theta. If the lookupTransform isn't functioning self.x,y,theta gets zeros
@@ -64,8 +65,8 @@ class Controller:
             rotation = (0.0,0.0,0.0,1.0)
         euler = tf.transformations.euler_from_quaternion(rotation)
         self.theta = euler[2]
-        self.x=translation2[0]
-        self.y=translation2[1]
+        self.x=translation[0]
+        self.y=translation[1]
 		
 		#Code pose controller
 		#move pose along path, find point we are closest to on path and make the target the next point on path
@@ -79,7 +80,7 @@ class Controller:
         #the difficult part is choosing the right point on path to target, then just use code from hw1
         #here we look what point on path we are currently at, and target the next point along path
         #the turtlebot will maintain a distance of about 1+0.5*resolution to 1-0.5*resolution from its goal point until the end.
-        distances = [np.linalg.norm(np.array((pathlist[i][0],pathlist[i][1]))-np.array((self.x,self.y))) for i in range(n)] #get distances to all points on current path from astar
+        distances = [np.linalg.norm(np.array((self.pathlist[i][0],self.pathlist[i][1]))-np.array((self.x,self.y))) for i in range(len(self.pathlist.poses))] #get distances to all points on current path from astar
         closest=distances.index(min(distances)) #index of closest point on path provided by astar
         if closest != len(pathlist)-1: #if the closest point on path is not the final goal target a point further along the path
             self.x_g=pathlist[closest+1][0]
@@ -136,9 +137,9 @@ class Controller:
         return cmd
 
     def run(self):
-        rate = rospy.Rate(10) # 10 Hz
+        rate = rospy.Rate(10) # 10 Hz 
         while not rospy.is_shutdown():
-            if self.use_controller: #if we want to use autonomous controller, (not human controlled), publish the autonomous control outputs
+            if self.use_controller and len(self.pathlist.poses) != 0: #if we want to use autonomous controller, (not human controlled), publish the autonomous control outputs
                 ctrl_output = self.get_ctrl_output()
                 self.pub.publish(ctrl_output)
             #if we are in user control mode nothing is published since keyop is in control

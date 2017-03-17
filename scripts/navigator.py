@@ -74,7 +74,7 @@ class Navigator:
         if bool(round(msg.data[0])) == True:
             self.execution_mode = True
             if msg.data[1] != self.nav_sp:
-                self.nav_sp = (msg.data[1][0],msg.data[1][1],msg.data[1][2])
+                self.nav_sp = (msg.data[1],msg.data[2],msg.data[3])
                 self.update_path()
 
         self.nav_path_pub.publish(self.current_path)
