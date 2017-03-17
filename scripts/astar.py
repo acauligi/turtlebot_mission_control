@@ -1,8 +1,7 @@
+import rospy
 import numpy as np
-from copy import deepcopy
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from numpy import pi, arange, linspace, array, zeros, ones, eye, mean, std, var, cov, cos, sin, tan, arccos, arcsin, arctan2, argmin, argmax, argsort, cross, dot, hstack, vstack, sqrt
 
 # Represents a motion planning problem to be solved using A*
 class AStar(object):
@@ -14,24 +13,17 @@ class AStar(object):
         self.x_goal = x_goal                  # goal state
         self.occupancy = occupancy            # occupancy grid
         self.resolution = resolution          # resolution of the discretization of state space (cell/m)
+
         self.closed_set = []    # the set containing the states that have been visited
-        self.open_set = []      # the set containing the states that are candidate for future expansion
-        
-        # dictionary of the g score (cost-to-go from start to state)
-        self.g_score = {}       
-        self.g_score[x_init] = 0
-        
-        # dictionary of the f score (estimated cost from start to goal passing through state)
-        self.f_score = {}       
-        self.f_score[x_init] = self.distance(x_init,x_goal)
+        self.open_set = []      # the set containing the states that are condidate for future expension
 
-        # dictionary keeping track of each state's parent to reconstruct the path
-        self.came_from = {}     
-
-        # Kobuki bot radius 35cm from http://files.yujinrobot.com/kobuki/hardware/drawings/pdf/
-        self.kobuki_radius = 0.35
+        self.f_score = {}       # dictionary of the f score (estimated cost from start to goal passing through state)
+        self.g_score = {}       # dictionary of the g score (cost-to-go from start to state)
+        self.came_from = {}     # dictionary keeping track of each state's parent to reconstruct the path
 
         self.open_set.append(x_init)
+        self.g_score[x_init] = 0
+        self.f_score[x_init] = self.distance(x_init,x_goal)
 
         self.path = None        # the final path as a list of states
 
@@ -76,19 +68,23 @@ class AStar(object):
     #           x - tuple state
     # OUTPUT: List of neighbors that are free, as a list of TUPLES
     def get_neighbors(self, x):
-        # TODO: fill me in!
-
-        motions = [(1,0), (-1,0), (0,1), (0,-1), (1,1), (1,-1), (-1,1), (-1,-1)]
-        motions = [tuple(self.resolution * tup for tup in motion) for motion in motions]
-
-        neighbors_list = []
-        for motion in motions:
-            step = [x[i]+motion[i] for i in range(len(motion))]
-
-            if self.is_free(step):
-                neighbors_list.append(tuple(step))
-        
-        return neighbors_list
+		xc = x[0]
+		yc = x[1]
+		neighbors = []
+		for i in range(3):
+			for j in range(3):
+				if i == 1 and j == 1:
+					continue
+				else:
+					pass
+				xn = xc + (i - 1)*self.resolution
+				yn = yc + (j - 1)*self.resolution 
+				new = (xn, yn)
+				if self.is_free(new):
+					neighbors.append(new)
+				else:
+					pass
+		return neighbors 
 
     # Gets the state in open_set that has the lowest f_score
     # INPUT: None
@@ -113,18 +109,17 @@ class AStar(object):
     # OUTPUT: None
     def plot_path(self):
         if not self.path:
-            print "No self.path exists"
             return
 
         fig = plt.figure()
 
         self.occupancy.plot(fig.number)
 
-        solution_path = np.array(self.path) * self.resolution
+        solution_path = np.array(self.path)
         plt.plot(solution_path[:,0],solution_path[:,1], color="green", linewidth=2, label="solution path", zorder=10)
-        plt.scatter([self.x_init[0]*self.resolution, self.x_goal[0]*self.resolution], [self.x_init[1]*self.resolution, self.x_goal[1]*self.resolution], color="green", s=30, zorder=10)
-        plt.annotate(r"$x_{init}$", np.array(self.x_init)*self.resolution + np.array([.2, 0]), fontsize=16)
-        plt.annotate(r"$x_{goal}$", np.array(self.x_goal)*self.resolution + np.array([.2, 0]), fontsize=16)
+        plt.scatter([self.x_init[0], self.x_goal[0]], [self.x_init[1], self.x_goal[1]], color="green", s=30, zorder=10)
+        plt.annotate(r"$x_{init}$", np.array(self.x_init) + np.array([.2, 0]), fontsize=16)
+        plt.annotate(r"$x_{goal}$", np.array(self.x_goal) + np.array([.2, 0]), fontsize=16)
         plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.03), fancybox=True, ncol=3)
 
         plt.axis('equal')
@@ -136,34 +131,37 @@ class AStar(object):
     # INPUT: None
     # OUTPUT: Boolean, True if a solution from x_init to x_goal was found
     def solve(self):
-        while len(self.open_set)>0:
-            xc = self.find_best_f_score()
+		counter =0
+		while len(self.open_set)>0:
+			counter = counter+1
+			if counter%20 == 0:
+				rospy.logwarn("At {} iterations".format(counter))
 
-            if xc == self.x_goal:
-                self.path = self.reconstruct_path()
-                return True 
-
-
-            self.closed_set.append(xc)
-            self.open_set = [coord for coord in self.open_set if coord != xc]
-    
-            for xn in self.get_neighbors(xc):
-                if xn in self.closed_set:
-                    continue
-
-                tgs = self.g_score[xc] + self.resolution 
-                tgs = self.g_score[xc] + self.distance(xc, self.x_goal) 
-
-                if xn not in self.open_set:
-                    self.open_set.append(xn)
-                elif tgs > self.g_score[xn]:
-                    continue
-
-                self.came_from[xn] = xc
-                self.g_score[xn] = tgs
-                self.f_score[xn] = tgs + self.distance(xn, self.x_goal)
-
-        return False
+			xc = self.find_best_f_score()
+			if xc == self.x_goal:
+				self.path = self.reconstruct_path() 
+				return True
+			else: 
+				pass
+			self.open_set.remove(xc)
+			self.closed_set.append(xc)
+			neighbors = self.get_neighbors(xc)
+			for xn in neighbors: 
+				if self.closed_set.count(xn) != 0:
+					continue
+				else:
+					pass
+				tent_g_score = self.g_score[xc] + self.distance(xc, xn)
+				if self.open_set.count(xn) == 0:
+					self.open_set.append(xn)
+				elif tent_g_score > self.g_score[xn]:
+					continue
+				else:
+					pass
+				self.came_from[xn] = xc
+				self.g_score[xn] = tent_g_score
+				self.f_score[xn] = tent_g_score + self.distance(xn, self.x_goal)
+		return False
 
 # A 2D state space grid with a set of rectangular obstacles. The grid is fully deterministic
 class DetOccupancyGrid2D(object):

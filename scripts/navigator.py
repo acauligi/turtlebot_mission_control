@@ -15,7 +15,7 @@ from nav_msgs.msg import MapMetaData
 import numpy as np
 import matplotlib.pyplot as plt
 import tf
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float32MultiArray, String
 from astar import AStar, StochOccupancyGrid2D, StochOccupancyGrid2D
 from nav_msgs.msg import Path
 from geometry_msgs.msg import PoseStamped
@@ -42,6 +42,7 @@ class Navigator:
 
         self.nav_sp = None
         self.execution_mode = False
+        self.update = False
 
         self.trans_listener = tf.TransformListener()
 
@@ -50,7 +51,7 @@ class Navigator:
 
         rospy.Subscriber("mission_mode", Float32MultiArray, self.nav_sp_callback)
 
-        self.nav_path_pub = rospy.Publisher('/turtlebot_mission_control/path_goal', Path, queue_size=10)
+        self.nav_path_pub = rospy.Publisher('/turtlebot_mission_control/path_goal', Path, queue_size=10) 
         self.wp_node_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
 
     def map_md_callback(self,msg):
@@ -73,11 +74,9 @@ class Navigator:
     def nav_sp_callback(self,msg):
         if bool(round(msg.data[0])) == True:
             self.execution_mode = True
-            if msg.data[1] != self.nav_sp:
-                self.nav_sp = (msg.data[1],msg.data[2],msg.data[3])
-                self.update_path()
-
-        self.nav_path_pub.publish(self.current_path)
+            if (msg.data[1], msg.data[2], msg.data[3]) != self.nav_sp:
+		self.nav_sp = (msg.data[1], msg.data[2], msg.data[3])
+		self.update = True
 
 
     def update_path(self):
@@ -92,11 +91,14 @@ class Navigator:
         if self.occupancy and self.has_robot_location:
             state_min = (-int(round(self.plan_horizon)), -int(round(self.plan_horizon)))
             state_max = (int(round(self.plan_horizon)), int(round(self.plan_horizon)))
-            x_init = (int(round(robot_translation[0])), int(round(robot_translation[1])))
-            x_goal = (int(round(self.nav_sp[0])), int(round(self.nav_sp[1])))
+            #x_init = (int(round(robot_translation[0])), int(round(robot_translation[1])))
+            #x_goal = (int(round(self.nav_sp[0])), int(round(self.nav_sp[1])))
+            x_init = (robot_translation[0], robot_translation[1])
+            x_goal = (self.nav_sp[0], self.nav_sp[1])
             astar = AStar(state_min,state_max,x_init,x_goal,self.occupancy,self.plan_resolution)
 
             rospy.loginfo("Computing navigation plan")
+            
             if astar.solve():
                 path_msg = Path()
                 path_msg.header.frame_id = 'map'
@@ -115,7 +117,16 @@ class Navigator:
                 rospy.logwarn("Could not find path")
 
     def run(self):
-        rospy.spin()
+        rate = rospy.Rate(1) # 10 Hz 
+        while not rospy.is_shutdown():
+            if self.execution_mode and self.update:
+                self.update_path()
+                self.update = False
+	    #msg = String()
+            #msg.data = 'EAT A DICK PROJECT'
+            self.nav_path_pub.publish(self.current_path)
+            rate.sleep()
+
 
 if __name__ == '__main__':
     nav = Navigator()
