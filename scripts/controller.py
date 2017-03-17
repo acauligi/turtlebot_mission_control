@@ -37,8 +37,8 @@ class Controller:
         # if being driven by user, use_controller = False
         self.use_controller = False 
 
-        self.pose_goal = None
-        self.pathlist = Path()
+        self.pose_goal = [0.0, 0.0, 0.0]
+        self.pathlist = []
 
         rospy.Subscriber('/mission_mode', Float32MultiArray, self.poseCallback) #final pose to be acheived in front of apriltag because now care about orientation
         rospy.Subscriber('/turtlebot_mission_control/path_goal', Path, self.pathCallback) #a list of nodes computed using a*
@@ -50,12 +50,18 @@ class Controller:
             rospy.loginfo_throttle(10,"Robot is driving autonomously!")
         else:
             self.use_controller = False
+        self.pose_goal=msg.data[1:4]
         # i.e. still exploring so let user drive, will not publish a control
 
         self.pose_goal = [msg.data[1], msg.data[2], msg.data[3]] #for final pose in front of desired apriltag saved as a list [x,y,theta] this is goal right in front of apriltag
 
     def pathCallback(self, msg):
-        self.pathlist = msg.data.poses #hopefully a list from astar such that pathlist[i][0] is the x coord of ith point along path for example
+        self.pathlist = []
+        for pose_st in msg.poses:
+            x = pose_st.pose.position.x
+            y = pose_st.pose.position.y
+            self.pathlist.append([x,y]) #hopefully a list from astar such that pathlist[i][0] is the x coord of ith point along path for example
+        rospy.logwarn(self.pathlist)
 
     def get_ctrl_output(self):
         #Get current position and assign to self.x,y, and theta. If the lookupTransform isn't functioning self.x,y,theta gets zeros
@@ -83,10 +89,10 @@ class Controller:
         #the turtlebot will maintain a distance of about 1+0.5*resolution to 1-0.5*resolution from its goal point until the end.
         distances = [np.linalg.norm(np.array((self.pathlist[i][0],self.pathlist[i][1]))-np.array((self.x,self.y))) for i in range(len(self.pathlist))] #get distances to all points on current path from astar
         closest=distances.index(min(distances)) #index of closest point on path provided by astar
-        if closest != len(pathlist)-1: #if the closest point on path is not the final goal target a point further along the path
-            self.x_g=pathlist[closest+1][0]
-            self.y_g=pathlist[closest+1][1]
-            self.th_g=np.arctan2(pathlist[closest+1][1]-pathlist[closest][1],pathlist[closest+1][0]-pathlist[closest][0]) #make it parallel to current path(line segment) we are on
+        if closest != len(self.pathlist)-1: #if the closest point on path is not the final goal target a point further along the path
+            self.x_g=self.pathlist[closest+1][0]
+            self.y_g=self.pathlist[closest+1][1]
+            self.th_g=np.arctan2(self.pathlist[closest+1][1]-self.pathlist[closest][1],self.pathlist[closest+1][0]-self.pathlist[closest][0]) #make it parallel to current path(line segment) we are on
             #we use separate gains based on our situation, less worried about approaching a final goal here so k3 is low
             k1=0.6
             k2=30.0
@@ -117,7 +123,7 @@ class Controller:
         # Divide by pi b/c sinc(x):=sin(pi*x)/(pi*x)
         # Apply saturation limits
         V = np.sign(V)*min(0.5, np.abs(V))
-        om = np.sign(om)*min(1.0, np.abs(om))
+        om = np.sign(om)*min(2.0, np.abs(om))
         
         #Make final check, if at the goal, just stop
         currentpos=np.array((self.x,self.y))
@@ -132,7 +138,7 @@ class Controller:
             V=0.0
             om=0.0
             rospy.logwarn("Arriving at Goal: Stopping until goal is changed.")
-		
+
         #Package results into cmd
         cmd_x_dot = V
         cmd_theta_dot = om

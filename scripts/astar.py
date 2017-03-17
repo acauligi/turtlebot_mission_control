@@ -8,9 +8,9 @@ class AStar(object):
 
     def __init__(self, statespace_lo, statespace_hi, x_init, x_goal, occupancy, resolution=1):
         self.statespace_lo = statespace_lo    # state space lower bound (e.g., (-5, -5))
-        self.statespace_hi = statespace_hi    # state space upper bound (e.g., (5, 5))
-        self.x_init = x_init                  # initial state
-        self.x_goal = x_goal                  # goal state
+        self.statespace_hi = statespace_hi    # state space upper bound (e.g., (5, 5))   
+        self.x_init = self.snap_to_grid(x_init, resolution)
+        self.x_goal = self.snap_to_grid(x_goal, resolution)
         self.occupancy = occupancy            # occupancy grid
         self.resolution = resolution          # resolution of the discretization of state space (cell/m)
 
@@ -32,6 +32,9 @@ class AStar(object):
     # INPUT: (x)
     #          x - tuple state
     # OUTPUT: Boolean True/False
+    def snap_to_grid(self, xy, resolution):
+        return (resolution*round(xy[0]/resolution), resolution*round(xy[1]/resolution))
+
     def is_free(self, x):
         if x==self.x_init or x==self.x_goal:
             return True
@@ -99,7 +102,9 @@ class AStar(object):
     def reconstruct_path(self):
         path = [self.x_goal]
         current = path[-1]
-        while current != self.x_init:
+        counter = 0
+        #while current != self.x_init:
+        while np.allclose(current[0:2],self.x_init[0:2],0.0001,0.1):
             path.append(self.came_from[current])
             current = path[-1]
         return list(reversed(path))
@@ -138,7 +143,8 @@ class AStar(object):
 				rospy.logwarn("At {} iterations".format(counter))
 
 			xc = self.find_best_f_score()
-			if xc == self.x_goal:
+			if np.allclose(xc[0:2],self.x_goal[0:2],0.0001,0.1):
+				#if xc == self.x_goal: 
 				self.path = self.reconstruct_path() 
 				return True
 			else: 
