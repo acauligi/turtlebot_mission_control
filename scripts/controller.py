@@ -123,14 +123,14 @@ class Controller:
         # Divide by pi b/c sinc(x):=sin(pi*x)/(pi*x)
         # Apply saturation limits
         V = np.sign(V)*min(0.5, np.abs(V))
-        om = np.sign(om)*min(2.0, np.abs(om))
+        om = np.sign(om)*min(1.5, np.abs(om))
         
         #Make final check, if at the goal, just stop
         currentpos=np.array((self.x,self.y))
         goalpos=np.array((self.pose_goal[0],self.pose_goal[1]))
         
         reltol=0.000001 #very small percent relative tolerance since large numbers should not affect okay stopping area too much
-        linatol=0.02 #2cm absolute linear tolerance
+        linatol=0.03 #3cm absolute linear tolerance
         angatol=0.17 #absolute angular tolerance in radians, 0.17 rad~10 deg
         
         #if our current position is our goal, or close enough, stop moving until different path is provided
@@ -149,7 +149,7 @@ class Controller:
         return cmd
 
     def run(self):
-        rate = rospy.Rate(10) # 10 Hz 
+        rate = rospy.Rate(2) # 2 Hz slowed from 10 to prevent chatter
         while not rospy.is_shutdown():
             if self.use_controller and len(self.pathlist) != 0: #if we want to use autonomous controller, (not human controlled), publish the autonomous control outputs
                 ctrl_output = self.get_ctrl_output()
