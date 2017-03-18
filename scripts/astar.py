@@ -21,6 +21,8 @@ class AStar(object):
         self.g_score = {}       # dictionary of the g score (cost-to-go from start to state)
         self.came_from = {}     # dictionary keeping track of each state's parent to reconstruct the path
 
+        self.kobuki_radius = 0.15
+
         self.open_set.append(x_init)
         self.g_score[x_init] = 0
         self.f_score[x_init] = self.distance(x_init,x_goal)
@@ -45,14 +47,15 @@ class AStar(object):
                 return False
         if not self.occupancy.is_free(x):
             return False
-        # thetas = np.arange(0, 2*pi, pi/10)
-        # x_here = deepcopy(x)
-        # for theta in thetas:
-        #     x_here[0] = x + self.kobuki_radius*cos(theta)
-        #     x_here[1] = x + self.kobuki_radius*sin(theta)
+        
+        thetas = np.arange(0, 2*pi, pi/10)
+        x_here = deepcopy(x)
+        for theta in thetas:
+            x_here[0] = x[0] + self.kobuki_radius*cos(theta)
+            x_here[1] = x[1] + self.kobuki_radius*sin(theta)
 
-        #     if not self.occupancy.is_free(x_here):
-        #         return False
+            if not self.occupancy.is_free(x_here):
+                return False
         return True
 
     # computes the euclidean distance between two states
