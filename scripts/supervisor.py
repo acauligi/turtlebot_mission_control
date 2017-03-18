@@ -55,6 +55,9 @@ class Supervisor:
 
         self.testing_pub = rospy.Publisher('/testingOnly', Float32MultiArray, queue_size=10)
 
+        self.we_are_done = False
+        self.mission_complete = rospy.Publisher('/success', Bool, queue_size=10)
+
         self.flag = 0. #exploration phase, no navigator
         self.loc = [0., 0., 0.]
         self.thresh=0.1
@@ -131,6 +134,10 @@ class Supervisor:
                     self.step+=1
                     self.current_g=np.array(self.waypoint_locations[self.mission[self.step]])
                     rospy.logwarn(self.current_g)
+
+                    if self.step == 8:
+						self.we_are_done = True
+
                 else:
                     rospy.logwarn('on the way')
                 
@@ -141,6 +148,10 @@ class Supervisor:
                 msg.data=[0., 0., 0., 0.]
 
             self.mode_pub.publish(msg)
+
+            msg = Bool()
+			msg.data = self.we_are_done
+            self.mission_complete.publish(msg)
 
             tagsSeen = Float32MultiArray()
             tagsSeen.data = self.waypoint_locations.keys()
