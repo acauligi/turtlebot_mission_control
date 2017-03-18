@@ -3,6 +3,7 @@
 import rospy
 from std_msgs.msg import Int32MultiArray, Float32MultiArray, String
 from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import Bool
 import tf
 import numpy as np
 
@@ -150,7 +151,7 @@ class Supervisor:
             self.mode_pub.publish(msg)
 
             msg = Bool()
-			msg.data = self.we_are_done
+            msg.data = self.we_are_done
             self.mission_complete.publish(msg)
 
             tagsSeen = Float32MultiArray()

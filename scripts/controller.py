@@ -41,7 +41,7 @@ class Controller:
         self.pathlist = []
 
         rospy.Subscriber('/mission_mode', Float32MultiArray, self.poseCallback) #final pose to be acheived in front of apriltag because now care about orientation
-        rospy.Subscriber('/turtlebot_mission_control/path_goal', Path, self.pathCallback) #a list of nodes computed using a*
+        rospy.Subscriber('/turtlebot_controller/path_goal', Path, self.pathCallback) #a list of nodes computed using a*
 		
     def poseCallback(self, msg):
         # robot autonomously drives

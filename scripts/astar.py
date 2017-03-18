@@ -48,14 +48,7 @@ class AStar(object):
         if not self.occupancy.is_free(x):
             return False
         
-        thetas = np.arange(0, 2*pi, pi/10)
-        x_here = deepcopy(x)
-        for theta in thetas:
-            x_here[0] = x[0] + self.kobuki_radius*cos(theta)
-            x_here[1] = x[1] + self.kobuki_radius*sin(theta)
 
-            if not self.occupancy.is_free(x_here):
-                return False
         return True
 
     # computes the euclidean distance between two states
@@ -65,6 +58,9 @@ class AStar(object):
     # OUTPUT: Float euclidean distance
     def distance(self, x1, x2):
         return np.linalg.norm(np.array(x1)-np.array(x2))
+
+    def snap_to_grid(self, xy, res):
+        return (res*round(xy[0]/res), res*round(xy[1]/res))
 
     # gets the FREE neighbor states of a given state. Assumes a motion model
     # where we can move up, down, left, right, or along the diagonals
@@ -81,11 +77,9 @@ class AStar(object):
 			for j in range(3):
 				if i == 1 and j == 1:
 					continue
-				else:
-					pass
 				xn = xc + (i - 1)*self.resolution
 				yn = yc + (j - 1)*self.resolution 
-				new = (xn, yn)
+				new = self.snap_to_grid((xn, yn), self.resolution)
 				if self.is_free(new):
 					neighbors.append(new)
 				else:
@@ -107,7 +101,7 @@ class AStar(object):
         current = path[-1]
         counter = 0
         #while current != self.x_init:
-        while np.allclose(current[0:2],self.x_init[0:2],0.0001,0.1):
+        while not np.allclose(current[0:2],self.x_init[0:2],0.0001,0.1):
             path.append(self.came_from[current])
             current = path[-1]
         return list(reversed(path))

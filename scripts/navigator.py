@@ -28,7 +28,7 @@ class Navigator:
     def __init__(self):
         rospy.init_node('navigator', anonymous=True)
 
-        self.plan_resolution = 0.10
+        self.plan_resolution = 0.2
         self.plan_horizon = 15
 
         self.map_width = 0
@@ -51,7 +51,7 @@ class Navigator:
 
         rospy.Subscriber("mission_mode", Float32MultiArray, self.nav_sp_callback)
 
-        self.nav_path_pub = rospy.Publisher('/turtlebot_mission_control/path_goal', Path, queue_size=10) 
+        self.nav_path_pub = rospy.Publisher('/turtlebot_controller/path_goal', Path, queue_size=10) 
         self.wp_node_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
 
     def map_md_callback(self,msg):
@@ -78,6 +78,8 @@ class Navigator:
 		self.nav_sp = (msg.data[1], msg.data[2], msg.data[3])
 		self.update = True
 
+    def snap_to_grid(self, xy, res):
+        return (res*round(xy[0]/res), res*round(xy[1]/res))
 
     def update_path(self):
         try:
@@ -93,8 +95,8 @@ class Navigator:
             state_max = (int(round(self.plan_horizon)), int(round(self.plan_horizon)))
             #x_init = (int(round(robot_translation[0])), int(round(robot_translation[1])))
             #x_goal = (int(round(self.nav_sp[0])), int(round(self.nav_sp[1])))
-            x_init = (robot_translation[0], robot_translation[1])
-            x_goal = (self.nav_sp[0], self.nav_sp[1])
+            x_init = self.snap_to_grid((robot_translation[0], robot_translation[1]), self.plan_resolution)
+            x_goal = self.snap_to_grid((self.nav_sp[0], self.nav_sp[1]), self.plan_resolution)
             astar = AStar(state_min,state_max,x_init,x_goal,self.occupancy,self.plan_resolution)
 
             rospy.loginfo("Computing navigation plan")
